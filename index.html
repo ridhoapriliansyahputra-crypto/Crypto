@@ -1628,7 +1628,7 @@
         <div class="mono" id="db-tersedia-line" style="font-size:12px; opacity:.85; margin-top:-2px; margin-bottom:2px; display:none;"></div>
         <div class="sub-balances">
           <div class="pill" data-detail="piutang" style="cursor:pointer;"><div class="l">Piutang berjalan ›</div><div class="v mono" id="db-piutang">Rp0</div></div>
-          <div class="pill" data-detail="hutang" style="cursor:pointer;"><div class="l">Hutang & Tagihan belum lunas ›</div><div class="v mono" id="db-hutang">Rp0</div></div>
+          <div class="pill" data-detail="hutang" title="Hutang & Tagihan belum lunas" style="cursor:pointer;"><div class="l">Hutang & Tagihan belum lunas ›</div><div class="v mono" id="db-hutang">Rp0</div></div>
           <div class="pill" data-detail="titipan" style="cursor:pointer;"><div class="l">Dana Titipan ›</div><div class="v mono" id="db-titipan">Rp0</div></div>
         </div>
       </div>
@@ -4104,6 +4104,25 @@ var JENIS_ICON = {
   /* nama lama (data lama yang sudah tersimpan tetap dapat ikon yang pas) */
   "Sewa dan Maintenance":"home", "Pengeluaran Keuangan Lainnya":"dollar"
 };
+/* Warna tetap per kategori pengeluaran (dipakai Insight, daftar transaksi, dan picker) supaya logo kategori konsisten di mana-mana */
+var JENIS_COLOR = {
+  "Jajan":"#7048E8", "Makanan dan Minuman":"#0F9D8E", "Maintenance":"#E8A33D",
+  "Transportasi":"#2E7DF6", "Kesehatan":"#E5484D", "Belanja":"#D6409F", "Donasi dan Hadiah":"#F76808",
+  "Donasi dan Infaq":"#E5484D", "Hadiah":"#F76808", "Travel":"#0EA5A4", "Hiburan":"#8E4EC6", "Edukasi":"#3E63DD",
+  "Patungan/Split Bill":"#12A594", "Sewa":"#946A00", "Uang Bulanan":"#5B6AD0", "Perawatan Diri":"#E93D82",
+  "Parkir":"#4C6B8A", "Alat Tulis Kantor":"#6E56CF", "Telephone":"#2D7FF9", "Telepon":"#2D7FF9",
+  "Biaya Admin Bank":"#687076", "Biaya Admin Transfer":"#687076", "Biaya Admin Tagihan":"#687076",
+  "Fee Beli Investasi":"#30A46C", "Fee Jual Investasi":"#30A46C", "Kerugian Investasi":"#E5484D",
+  "Piutang Tak Tertagih":"#CE2C31", "Pembelian Aset untuk Orang Lain":"#AB6400", "Lain Lain":"#7C8794"
+};
+function jenisColor(j, fallbackIdx){
+  if(window.INSTR_COLOR && INSTR_COLOR[j]) return INSTR_COLOR[j];
+  if(JENIS_COLOR[j]) return JENIS_COLOR[j];
+  var pal=['#7048E8','#0F9D8E','#E8A33D','#2E7DF6','#D6409F','#12A594'];
+  if(typeof fallbackIdx==='number') return pal[fallbackIdx%pal.length];
+  var h=0, t=String(j||''); for(var i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))>>>0;
+  return pal[h%pal.length];
+}
 var TYPE_ICON = { transfer:"transfer", pemasukan:"arrowDown", pengeluaran:"arrowUp", piutang:"send", hutang:"receive", titipan:"lock",
   belanja:"cart", invbeli:"trendUp", invjual:"dollar", tagihan:"receipt" };
 /* Badge leading di daftar transaksi: merchant -> logo; pengeluaran tanpa merchant -> ikon Jenis; tipe lain -> ikon tipe. */
@@ -4111,10 +4130,11 @@ var TEL_RE = /^(telephone|telepon|telp|pulsa|paket data|internet)/i;
 function isTelJenis(j){ return TEL_RE.test(String(j||'').trim()); }
 function txnLeadBadge(type, jenis, merchant){
   var m = merchant ? merchantByName(merchant) : null;
-  if(!m && type==='pengeluaran' && isTelJenis(jenis)) return '<span class="acc-badge tel-badge">'+(ICONS.phoneSignal||ICONS.phone)+'</span>';
+  if(!m && type==='pengeluaran' && isTelJenis(jenis)) return '<span class="acc-badge jenis-badge" style="background:'+jenisColor('Telephone')+'">'+(ICONS.phoneSignal||ICONS.phone)+'</span>';
   if(m) return '<span class="acc-badge img-square" style="background:'+m.bg+'"><img src="'+m.img+'" alt="'+escapeHtml(m.nama)+'"></span>';
   var key = (type==='pengeluaran') ? (JENIS_ICON[jenis] || 'tag') : (TYPE_ICON[type] || 'tag');
   if(type==='pengeluaran' && !JENIS_ICON[jenis]) key = 'tag';
+  if(type==='pengeluaran') return '<span class="acc-badge jenis-badge" style="background:'+jenisColor(jenis)+'">'+(ICONS[key]||ICONS.tag)+'</span>';
   return '<span class="acc-badge ic-soft">'+(ICONS[key]||ICONS.tag)+'</span>';
 }
 /* Daftar merchant yang boleh dipilih per form. Tanpa entri di sini = semua merchant (default lama, dipakai Pengeluaran). */
@@ -10437,7 +10457,7 @@ function renderInsight(currentTotal){
     cap = '';
   }
 
-  var h = '<div class="ins '+cls+'">';
+  var h = '<div class="ins '+cls+(window._insOpen?' open':'')+'">';
   /* hero */
   h += '<div class="ins-hero"><div class="ins-badge">'+ico+'</div><div class="ins-main">'+
        '<div class="ins-chip">'+chip+'</div>'+
@@ -10461,6 +10481,7 @@ function renderInsight(currentTotal){
         '<div class="ins-row prev"><span class="ins-lb">'+L('Bulan lalu','Last month')+'</span><div class="ins-track"><i style="width:'+Math.max(4, Math.round(lastSame/mx*100))+'%"></i></div><b class="mono">'+fmt(lastSame)+'</b></div></div>';
     }
 
+    h += '<div class="ins-more">';
     /* 7 hari terakhir */
     var days = [], dmax = 1, DN = isEN() ? ['Su','Mo','Tu','We','Th','Fr','Sa'] : ['Mg','Sn','Sl','Rb','Km','Jm','Sb'];
     for(var k=6; k>=0; k--){
@@ -10485,13 +10506,16 @@ function renderInsight(currentTotal){
       tl.items.forEach(function(it, idx){
         var p = tl.total>0 ? Math.round(it.val/tl.total*100) : 0;
         var key = isTelJenis(it.jenis) ? 'phoneSignal' : (JENIS_ICON[it.jenis]||'tag');
-        var col = (window.INSTR_COLOR && INSTR_COLOR[it.jenis]) || ['#7048E8','#0F9D8E','#E8A33D'][idx%3];
+        var col = jenisColor(it.jenis, idx);
         h += '<div class="ins-top3"><span class="ins-tic" style="background:'+col+'">'+(ICONS[key]||ICONS.tag)+'</span>'+
              '<div class="ins-tmid"><div class="ins-trow"><span class="ins-ttx"><b>'+escapeHtml(it.jenis)+'</b></span><span class="ins-tval mono">'+fmt(it.val)+'</span></div>'+
              '<div class="ins-ttrack"><i style="width:'+Math.max(4,p)+'%; background:'+col+'"></i></div></div><span class="ins-tpct">'+p+'%</span></div>';
       });
       h += '</div>';
     }
+  }
+  if(st!=='empty'){
+    h += '</div><button type="button" class="ins-toggle" onclick="var i=this.closest(\'.ins\'); i.classList.toggle(\'open\'); window._insOpen=i.classList.contains(\'open\');"><span class="a">Lihat detail ▾</span><span class="b">Sembunyikan ▴</span></button>';
   }
   h += '<div class="ins-msg">'+msg+'</div></div>';
   el.innerHTML = h;
@@ -19157,6 +19181,8 @@ if(document.readyState==='loading'){
 "rincian rekening": "account details",
 "sumber pemasukan": "income source",
 "Mode Tamu": "Guest Mode",
+"Lihat detail ▾": "Show details ▾",
+"Sembunyikan ▴": "Hide ▴",
 "Cek Akurasi Data (uji angka aplikasi)": "Data Accuracy Check (app figures test)",
 "+ Ketik nama lain": "+ Type another name",
 ", pembelian stok": ", stock purchases",
@@ -19328,7 +19354,7 @@ if(document.readyState==='loading'){
     var jk=(!b && window.JENIS_ICON && window.ICONS) ? (JENIS_ICON[v]||JENIS_ICON[t]) : null;
     var dic=opt&&opt.getAttribute&&opt.getAttribute('data-ic'); if(dic&&window.ICONS&&ICONS[dic]) jk=dic;
     if(jk && ICONS[jk]){
-      d.style.background=(window.INSTR_COLOR&&INSTR_COLOR[v||t])||COLORS[hash(v||t)%COLORS.length];
+      d.style.background=(window.jenisColor?jenisColor(v||t):((window.INSTR_COLOR&&INSTR_COLOR[v||t])||COLORS[hash(v||t)%COLORS.length]));
       d.innerHTML=ICONS[jk];
       var sv=d.querySelector('svg'); if(sv){ sv.setAttribute('width','18'); sv.setAttribute('height','18'); sv.style.cssText='display:block;color:#fff;stroke:currentColor'; }
       return d;
@@ -22748,6 +22774,32 @@ html[data-layout="desktop"] .view:not(#view-dashboard):not(#view-riwayat):not(#v
 /* judul kartu & hero: lebih lega */
 html[data-layout="desktop"] .view:not(#view-dashboard):not(#view-riwayat):not(#view-catat):not(#view-laporan):not(#view-pengaturan) .hero-card{padding:18px 18px 20px;}
 html[data-layout="desktop"] .view:not(#view-dashboard):not(#view-riwayat):not(#view-catat):not(#view-laporan):not(#view-pengaturan) .hero-card .hero-sub{max-width:100%;}
+
+/* ---- v3r: Insight ringkas di desktop (detail dilipat biar kolom tidak terlalu panjang) ---- */
+.ins-toggle{display:none;}
+html[data-layout="desktop"] .ins-toggle{display:flex; align-items:center; justify-content:center; width:100%; border:0; background:rgba(127,127,127,.12); color:var(--text-2); font:inherit; font-size:12px; font-weight:700; padding:6px 0; border-radius:10px; cursor:pointer;}
+html[data-layout="desktop"] .ins-toggle .b, html[data-layout="desktop"] .ins.open .ins-toggle .a{display:none;}
+html[data-layout="desktop"] .ins.open .ins-toggle .b{display:inline;}
+html[data-layout="desktop"] .ins:not(.open) .ins-more{display:none;}
+html[data-layout="desktop"] .ins{gap:10px;}
+html[data-layout="desktop"] .ins-hero{padding:10px 12px;}
+html[data-layout="desktop"] .ins-hero .ins-badge{width:42px; height:42px; border-radius:13px;}
+html[data-layout="desktop"] .ins-msg{font-size:12px; padding:8px 10px;}
+
+/* ---- v3q: kotak saldo Beranda mode desktop dibuat ramping (sapaan di kiri, saldo + pill sejajar di kanan) ---- */
+html[data-layout="desktop"] #view-dashboard .topbar{display:grid; grid-template-columns:minmax(190px,24%) minmax(0,1fr); column-gap:18px; align-items:center; padding:10px 16px;}
+html[data-layout="desktop"] #view-dashboard .topbar-greet-row{margin:0; align-items:center;}
+html[data-layout="desktop"] #view-dashboard .topbar h1{font-size:15px; -webkit-line-clamp:3;}
+html[data-layout="desktop"] #view-dashboard .balance-panel{margin:0; padding:8px 14px; display:grid; grid-template-columns:minmax(170px,auto) minmax(0,1fr); grid-template-rows:auto auto auto; column-gap:18px; align-items:center;}
+html[data-layout="desktop"] #view-dashboard .balance-panel .balance-line{grid-column:1; grid-row:1; margin:0; gap:10px; justify-content:flex-start !important;}
+html[data-layout="desktop"] #view-dashboard .balance-panel #db-mode-switch{grid-column:2; grid-row:1; justify-self:end; margin:0;}
+html[data-layout="desktop"] #view-dashboard .balance-panel #db-mode-switch button{padding:3px 12px; font-size:11px;}
+html[data-layout="desktop"] #view-dashboard .balance-panel .balance-num{grid-column:1; grid-row:2; font-size:25px; line-height:1.15; margin:0;}
+html[data-layout="desktop"] #view-dashboard .balance-panel #db-tersedia-line{grid-column:1; grid-row:3; margin:0 !important; font-size:11px !important;}
+html[data-layout="desktop"] #view-dashboard .balance-panel .sub-balances{grid-column:2; grid-row:2 / span 2; margin:0; gap:8px; align-self:center;}
+html[data-layout="desktop"] #view-dashboard .balance-panel .sub-balances .pill{padding:5px 10px;}
+html[data-layout="desktop"] #view-dashboard .balance-panel .sub-balances .pill .l{min-height:0; -webkit-line-clamp:1; margin-bottom:2px;}
+html[data-layout="desktop"] #view-dashboard .balance-panel .sub-balances .pill .v{font-size:12.5px;}
 /* kolom kiri/kanan: kalau layar sempit (<760px) susun atas-bawah saja */
 
 /* pembungkus field (mis. Untuk + Jenis Pengeluaran) ikut grid 2 kolom otomatis */
@@ -22922,6 +22974,11 @@ html[data-layout="desktop"] .modal-box{max-width:420px;border-radius:22px;paddin
 html[data-layout="desktop"] .modal-actions button:hover{filter:brightness(1.08)}
 html[data-layout="desktop"] #cek-akurasi-overlay > .card,html[data-layout="desktop"] #arsip-overlay > div,html[data-layout="desktop"] #backup-overlay > div{border-radius:22px}
 @media (prefers-reduced-motion:reduce){.modal-overlay.show,.modal-overlay.show > *{animation:none}}
+
+/* ---- Logo kategori pengeluaran: gaya Insight (kotak warna solid + ikon putih) ---- */
+.acc-badge.jenis-badge{color:#fff !important; border-color:transparent !important; box-shadow:0 3px 8px color-mix(in srgb,currentColor 0%,transparent), 0 3px 8px rgba(0,0,0,.12);}
+.acc-badge.jenis-badge svg{width:20px; height:20px; stroke:currentColor;}
+.txn-row.v2 > .acc-badge.jenis-badge{width:40px; height:40px; border-radius:12px;}
 </style>
 </body>
 </html>
